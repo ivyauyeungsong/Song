@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>千愛歌譜 分批處理 0.18</title>
+<style>
+body{font-family:-apple-system,sans-serif;padding:16px;background:#f5f5f7;color:#222}
+.card{background:#fff;padding:16px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);margin-bottom:16px}
+button{padding:10px 14px;border:1px solid #ccc;border-radius:6px;background:#fff;font-size:16px}
+.primary{background:#0a84ff;color:#fff;border:none}
+.warn{background:#ff3b30;color:#fff;border:none}
+#status{white-space:pre-wrap;font-family:monospace;font-size:14px;background:#111;color:#0f0;padding:10px;border-radius:6px;min-height:120px}
+input[type=file]{font-size:16px}
+</style>
+</head>
+<body>
+<h2>千愛歌譜 分批處理 0.18</h2>
+
+<div class="card">
+<p>請選擇 <b>songbook-backup-05 5.json</b>（165.8 MB）。</p>
+<input type="file" id="jsonFile" accept=".json,application/json">
+<br><br>
+<button class="primary" id="analyzeBtn">分批分析</button>
+<button class="warn" id="resetBtn">重設</button>
+</div>
+
+<div class="card">
+<h3>分析結果</h3>
+<div id="stats">尚未分析。</div>
+</div>
+
+<div class="card">
+<h3>處理紀錄</h3>
+<div id="status">等待選擇檔案…</div>
+</div>
+
+<script>
+const fileInput=document.getElementById('jsonFile');
+const analyzeBtn=document.getElementById('analyzeBtn');
+const resetBtn=document.getElementById('resetBtn');
+const stats=document.getElementById('stats');
+const status=document.getElementById('status');
+
+function log(msg){status.textContent+=msg+'\n';}
+function setStats(msg){stats.textContent=msg;}
+
+analyzeBtn.addEventListener('click',()=>{
+  const file=fileInput.files[0];
+  if(!file){alert('請先選擇 JSON 檔案');return;}
+  setStats('已選擇：'+file.name+'\n大小：'+(file.size/1024/1024).toFixed(1)+' MB');
+  log('已選擇檔案，準備分批讀取。');
+  log('注意：此版本先檢查檔案，不會更改任何資料。');
+});
+
+resetBtn.addEventListener('click',()=>{
+  fileInput.value='';
+  setStats('尚未分析。');
+  status.textContent='已重設。';
+});
+</script>
+</body>
+</html>
