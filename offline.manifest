@@ -1,0 +1,13 @@
+CACHE MANIFEST
+# publish-version:17-initial
+CACHE:
+index.html
+app.js
+sw.js
+diagnostic.html
+NETWORK:
+*
+https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/legacy/build/pdf.min.js
+https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/legacy/build/pdf.worker.min.js
+https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/cmaps/
+https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/standard_fonts/

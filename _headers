@@ -1,0 +1,9 @@
+/offline.manifest
+  Content-Type: text/cache-manifest
+  Cache-Control: no-cache
+/sw.js
+  Cache-Control: no-cache
+/library.json
+  Cache-Control: no-store
+/diagnostic.html
+  Cache-Control: no-store
