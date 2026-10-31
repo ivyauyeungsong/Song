@@ -9,9 +9,7 @@ body{font-family:-apple-system,sans-serif;padding:16px;background:#f5f5f7;color:
 .card{background:#fff;padding:16px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);margin-bottom:16px}
 button{padding:10px 14px;border:1px solid #ccc;border-radius:6px;background:#fff;font-size:16px}
 .primary{background:#0a84ff;color:#fff;border:none}
-.warn{background:#ff3b30;color:#fff;border:none}
-#status{white-space:pre-wrap;font-family:monospace;font-size:14px;background:#111;color:#0f0;padding:10px;border-radius:6px;min-height:120px}
-input[type=file]{font-size:16px}
+#status{white-space:pre-wrap;font-family:monospace;font-size:14px;background:#111;color:#0f0;padding:10px;border-radius:6px;min-height:150px}
 </style>
 </head>
 <body>
@@ -22,7 +20,6 @@ input[type=file]{font-size:16px}
 <input type="file" id="jsonFile" accept=".json,application/json">
 <br><br>
 <button class="primary" id="analyzeBtn">分批分析</button>
-<button class="warn" id="resetBtn">重設</button>
 </div>
 
 <div class="card">
@@ -38,26 +35,55 @@ input[type=file]{font-size:16px}
 <script>
 const fileInput=document.getElementById('jsonFile');
 const analyzeBtn=document.getElementById('analyzeBtn');
-const resetBtn=document.getElementById('resetBtn');
 const stats=document.getElementById('stats');
 const status=document.getElementById('status');
 
-function log(msg){status.textContent+=msg+'\n';}
-function setStats(msg){stats.textContent=msg;}
+function log(m){status.textContent+=m+'\n';}
 
-analyzeBtn.addEventListener('click',()=>{
+analyzeBtn.onclick=async()=>{
   const file=fileInput.files[0];
-  if(!file){alert('請先選擇 JSON 檔案');return;}
-  setStats('已選擇：'+file.name+'\n大小：'+(file.size/1024/1024).toFixed(1)+' MB');
-  log('已選擇檔案，準備分批讀取。');
-  log('注意：此版本先檢查檔案，不會更改任何資料。');
-});
+  if(!file){alert('請先選擇 JSON');return;}
+  status.textContent='';
+  stats.textContent='檔案：'+file.name+'\n大小：'+(file.size/1024/1024).toFixed(1)+' MB\n分析中…';
+  log('開始分批讀取…');
 
-resetBtn.addEventListener('click',()=>{
-  fileInput.value='';
-  setStats('尚未分析。');
-  status.textContent='已重設。';
-});
+  const CHUNK=1024*1024;
+  let text='',offset=0,songs=-1,cats=new Set(),pdf=0,jpg=0;
+
+  while(offset<file.size){
+    const blob=file.slice(offset,offset+CHUNK);
+    text+=await blob.text();
+    offset+=CHUNK;
+    log('已讀取 '+Math.min(offset,file.size/1024/1024).toFixed(1)+' / '+(file.size/1024/1024).toFixed(1)+' MB');
+    await new Promise(r=>setTimeout(r,0));
+  }
+
+  log('讀取完成，開始解析…');
+  const pack=JSON.parse(text);
+
+  if(pack&&Array.isArray(pack.songs)){
+    songs=pack.songs.length;
+    pack.songs.forEach(s=>{
+      cats.add(s.language||'未分類');
+      (s.files||[]).forEach(f=>{
+        if(f.type==='application/pdf')pdf++;
+        if(f.type==='image/jpeg')jpg++;
+      });
+    });
+  }
+
+  stats.textContent=
+    '檔案：'+file.name+'\n'+
+    '大小：'+(file.size/1024/1024).toFixed(1)+' MB\n'+
+    '格式：'+(pack.format||'未知')+'\n'+
+    '版本：'+(pack.version||'未知')+'\n'+
+    '歌譜總數：'+songs+'\n'+
+    '語言分類：'+cats.size+'\n'+
+    'PDF 數量：'+pdf+'\n'+
+    'JPG 數量：'+jpg;
+
+  log('分析完成。尚未更改或上傳任何資料。');
+};
 </script>
 </body>
 </html>
