@@ -9,22 +9,25 @@ body{font-family:-apple-system,sans-serif;padding:16px;background:#f5f5f7;color:
 .card{background:#fff;padding:16px;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.1);margin-bottom:16px}
 button{padding:10px 14px;border:1px solid #ccc;border-radius:6px;background:#fff;font-size:16px}
 .primary{background:#0a84ff;color:#fff;border:none}
-#status{white-space:pre-wrap;font-family:monospace;font-size:14px;background:#111;color:#0f0;padding:10px;border-radius:6px;min-height:150px}
+#status{white-space:pre-wrap;font-family:monospace;font-size:14px;background:#111;color:#0f0;padding:10px;border-radius:6px;min-height:180px}
+a{display:inline-block;margin-top:10px;padding:10px 14px;background:#34c759;color:#fff;border-radius:6px;text-decoration:none}
 </style>
 </head>
 <body>
 <h2>千愛歌譜 分批處理 0.18</h2>
 
 <div class="card">
-<p>請選擇 <b>songbook-backup-05 5.json</b>（165.8 MB）。</p>
+<p>請選擇 <b>songbook-backup-05 5.json</b>。</p>
 <input type="file" id="jsonFile" accept=".json,application/json">
 <br><br>
 <button class="primary" id="analyzeBtn">分批分析</button>
+<button id="exportBtn" disabled>分批匯出 0.18</button>
 </div>
 
 <div class="card">
 <h3>分析結果</h3>
 <div id="stats">尚未分析。</div>
+<div id="downloadArea"></div>
 </div>
 
 <div class="card">
@@ -35,54 +38,114 @@ button{padding:10px 14px;border:1px solid #ccc;border-radius:6px;background:#fff
 <script>
 const fileInput=document.getElementById('jsonFile');
 const analyzeBtn=document.getElementById('analyzeBtn');
+const exportBtn=document.getElementById('exportBtn');
 const stats=document.getElementById('stats');
 const status=document.getElementById('status');
+const downloadArea=document.getElementById('downloadArea');
+
+let PACK=null;
 
 function log(m){status.textContent+=m+'\n';}
+
+function b64ToBlob(dataUrl,type){
+  const parts=dataUrl.split(',');
+  const mime=(parts[0].match(/data:(.*?);base64/)||[])[1]||type;
+  const bin=atob(parts[1]);
+  const arr=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+  return new Blob([arr],{type:mime});
+}
+
+function saveBlob(blob,name){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
 
 analyzeBtn.onclick=async()=>{
   const file=fileInput.files[0];
   if(!file){alert('請先選擇 JSON');return;}
   status.textContent='';
-  stats.textContent='檔案：'+file.name+'\n大小：'+(file.size/1024/1024).toFixed(1)+' MB\n分析中…';
+  stats.textContent='分析中…';
   log('開始分批讀取…');
 
   const CHUNK=1024*1024;
-  let text='',offset=0,songs=-1,cats=new Set(),pdf=0,jpg=0;
+  let text='',offset=0;
 
   while(offset<file.size){
-    const blob=file.slice(offset,offset+CHUNK);
-    text+=await blob.text();
+    text+=await file.slice(offset,offset+CHUNK).text();
     offset+=CHUNK;
     log('已讀取 '+Math.min(offset,file.size/1024/1024).toFixed(1)+' / '+(file.size/1024/1024).toFixed(1)+' MB');
     await new Promise(r=>setTimeout(r,0));
   }
 
-  log('讀取完成，開始解析…');
-  const pack=JSON.parse(text);
-
-  if(pack&&Array.isArray(pack.songs)){
-    songs=pack.songs.length;
-    pack.songs.forEach(s=>{
-      cats.add(s.language||'未分類');
-      (s.files||[]).forEach(f=>{
-        if(f.type==='application/pdf')pdf++;
-        if(f.type==='image/jpeg')jpg++;
-      });
-    });
-  }
+  PACK=JSON.parse(text);
+  let pdf=0,jpg=0;
+  PACK.songs.forEach(s=>(s.files||[]).forEach(f=>{
+    if(f.type==='application/pdf')pdf++;
+    if(f.type==='image/jpeg')jpg++;
+  }));
 
   stats.textContent=
     '檔案：'+file.name+'\n'+
-    '大小：'+(file.size/1024/1024).toFixed(1)+' MB\n'+
-    '格式：'+(pack.format||'未知')+'\n'+
-    '版本：'+(pack.version||'未知')+'\n'+
-    '歌譜總數：'+songs+'\n'+
-    '語言分類：'+cats.size+'\n'+
-    'PDF 數量：'+pdf+'\n'+
-    'JPG 數量：'+jpg;
+    '歌譜總數：'+PACK.songs.length+'\n'+
+    'PDF：'+pdf+'\n'+
+    'JPG：'+jpg+'\n'+
+    '準備好可分批匯出。';
 
-  log('分析完成。尚未更改或上傳任何資料。');
+  exportBtn.disabled=false;
+  log('分析完成。按「分批匯出 0.18」會下載多個檔案。');
+};
+
+exportBtn.onclick=async()=>{
+  if(!PACK)return;
+  exportBtn.disabled=true;
+  status.textContent='';
+  log('開始產生 0.18 分檔資料…');
+
+  const library={
+    format:'songbook-public-05',
+    version:'split-'+Date.now(),
+    songs:[]
+  };
+
+  for(let i=0;i<PACK.songs.length;i++){
+    const s=PACK.songs[i];
+    const files=[];
+
+    for(let j=0;j<(s.files||[]).length;j++){
+      const f=s.files[j];
+      const ext=f.type==='application/pdf'?'pdf':'jpg';
+      const safe=(s.title||('song'+i)).replace(/[\\/:*?"<>|]/g,'_').slice(0,60);
+      const name=safe+'-'+(j+1)+'.'+ext;
+
+      log('處理 '+(i+1)+'/'+PACK.songs.length+'：'+name);
+      saveBlob(b64ToBlob(f.data,f.type),name);
+      files.push({name:name,type:f.type});
+
+      await new Promise(r=>setTimeout(r,300));
+    }
+
+    library.songs.push({
+      id:s.id,
+      title:s.title,
+      artists:s.artists,
+      language:s.language,
+      key:s.key,
+      minor:s.minor,
+      duet:s.duet,
+      files:files
+    });
+  }
+
+  log('產生 library.json…');
+  saveBlob(new Blob([JSON.stringify(library,null,2)],{type:'application/json'}),'library.json');
+
+  stats.textContent='完成！\n歌譜：'+library.songs.length+'\n已下載 PDF/JPG 及 library.json。';
+  log('全部完成。請將下載的檔案放入 GitHub Song 倉庫的 pdf/ 資料夾及根目錄。');
 };
 </script>
 </body>
